@@ -7,3 +7,4 @@ orjson
 aiohttp
 aiofiles
 pydantic
+telethon
