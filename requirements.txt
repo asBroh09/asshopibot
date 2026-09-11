@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+uvloop
+httptools
+curl_cffi
+orjson
+aiohttp
+aiofiles
+pydantic
