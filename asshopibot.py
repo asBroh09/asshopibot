@@ -2820,7 +2820,7 @@ async def process_user_sites_check(event_or_msg, user_id, sites_list, min_price,
                                 premium_emoji(f"🔄 <b>Cʜᴇᴄᴋɪɴɢ sɪᴛᴇs (Fɪʟᴛᴇʀ: ${min_price:g} - ${max_price:g})...</b>\n\n⏳ Pʀᴏɢʀᴇss: {checked_count}/{len(to_check)}\n✅ Aʟɪᴠᴇ: {len(alive_sites)}\n❌ Dᴇᴀᴅ/Sᴋɪᴘᴘᴇᴅ: {len(dead_sites)}"),
                                 parse_mode='html'
                             )
-                        except Exception:
+                        except ExcNion:
                             pass
             except Exception:
                 async with lock:
@@ -2831,7 +2831,7 @@ async def process_user_sites_check(event_or_msg, user_id, sites_list, min_price,
         await asyncio.gather(*tasks)
 
         # Save to database
-        added = await db_manager.add_user_sites(user_id, sites_with_price, max_limit=none)
+        added = await db_manager.add_user_sites(user_id, sites_with_price, max_limit=None)
         total_sites = await db_manager.count_user_sites(user_id)
 
         preview = "\n".join(alive_sites[:20])
@@ -3096,7 +3096,7 @@ async def site_command(event):
 
         # Update DB for user
         await db_manager.clear_user_sites(user_id)
-        await db_manager.add_user_sites(user_id, alive_with_price, max_limit=none)
+        await db_manager.add_user_sites(user_id, alive_with_price, max_limit=None)
 
         preview = "\n".join(alive_sites[:20])
         more = f"\n...and {len(alive_sites) - 20} more" if len(alive_sites) > 20 else ""
