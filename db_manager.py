@@ -1,10 +1,10 @@
-
 import aiosqlite
 import json
 import os
 from datetime import datetime, timedelta
 
 DB_FILE = "bot.db"
+
 
 async def init_db():
     async with aiosqlite.connect(DB_FILE) as db:
@@ -16,20 +16,20 @@ async def init_db():
                 plan TEXT DEFAULT 'premium'
             )
         """)
-        
-        # Migration: Add plan column to users if it doesn't exist
+
+        # Migration: Add plan column
         try:
             await db.execute("ALTER TABLE users ADD COLUMN plan TEXT DEFAULT 'premium'")
         except Exception:
             pass
 
-        # Migration: Add custom_limit column for custom max card limits
+        # Migration: Add custom_limit column
         try:
             await db.execute("ALTER TABLE users ADD COLUMN custom_limit INTEGER DEFAULT NULL")
         except Exception:
             pass
 
-        # Migration: Add is_adm_premium column for gen check bypass
+        # Migration: Add is_adm_premium column
         try:
             await db.execute("ALTER TABLE users ADD COLUMN is_adm_premium INTEGER DEFAULT 0")
         except Exception:
@@ -48,14 +48,14 @@ async def init_db():
                 created_by INTEGER
             )
         """)
-        
+
         await db.execute("""
             CREATE TABLE IF NOT EXISTS price_filters (
                 id INTEGER PRIMARY KEY,
                 data TEXT
             )
         """)
-        
+
         await db.execute("""
             CREATE TABLE IF NOT EXISTS sites_price (
                 id INTEGER PRIMARY KEY,
@@ -87,7 +87,7 @@ async def init_db():
                 checked_at TEXT
             )
         """)
-        
+
         await db.execute("""
             CREATE TABLE IF NOT EXISTS user_sites (
                 user_id INTEGER,
@@ -107,7 +107,15 @@ async def init_db():
             )
         """)
 
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS banned_users (
+                user_id INTEGER PRIMARY KEY,
+                reason TEXT
+            )
+        """)
+
         await db.commit()
+
 
 async def auto_migrate():
     await init_db()
@@ -123,7 +131,7 @@ async def auto_migrate():
                 os.rename("all_users.txt", "all_users.txt.bak")
             except Exception as e:
                 print("Error migrating all_users.txt:", e)
-                
+
         # Migrate premium expiry mapping
         expiry_map = {}
         if os.path.exists("premium_expiry.json"):
@@ -191,7 +199,8 @@ async def auto_migrate():
 
         await db.commit()
 
-# -- DATA ACCESS FUNCTIONS --
+
+# ─── USER DATA ────────────────────────────────────────────────────────
 
 async def get_all_bot_users():
     async with aiosqlite.connect(DB_FILE) as db:
@@ -199,10 +208,12 @@ async def get_all_bot_users():
             rows = await cursor.fetchall()
             return [r[0] for r in rows]
 
+
 async def save_bot_user(user_id):
     async with aiosqlite.connect(DB_FILE) as db:
         await db.execute("INSERT OR IGNORE INTO users (user_id) VALUES (?)", (int(user_id),))
         await db.commit()
+
 
 async def get_premium_users():
     async with aiosqlite.connect(DB_FILE) as db:
@@ -210,11 +221,13 @@ async def get_premium_users():
             rows = await cursor.fetchall()
             return [str(r[0]) for r in rows]
 
+
 async def get_premium_users_details():
     async with aiosqlite.connect(DB_FILE) as db:
         async with db.execute("SELECT user_id, premium_expiry, plan FROM users WHERE is_premium = 1") as cursor:
             rows = await cursor.fetchall()
             return [{'user_id': r[0], 'expiry': r[1], 'plan': r[2]} for r in rows]
+
 
 async def get_premium_expiry(user_id):
     async with aiosqlite.connect(DB_FILE) as db:
@@ -222,16 +235,17 @@ async def get_premium_expiry(user_id):
             row = await cursor.fetchone()
             return row[0] if row else None
 
+
 async def is_premium_db(user_id, admin_ids):
     if user_id in admin_ids or str(user_id) in [str(a) for a in admin_ids]:
         return True
-    
+
     async with aiosqlite.connect(DB_FILE) as db:
         async with db.execute("SELECT is_premium, premium_expiry, is_adm_premium FROM users WHERE user_id = ?", (int(user_id),)) as cursor:
             row = await cursor.fetchone()
             if not row:
                 return False
-            
+
             is_prem = row[0]
             expiry_str = row[1]
             is_adm = row[2] if len(row) > 2 and row[2] is not None else 0
@@ -241,7 +255,6 @@ async def is_premium_db(user_id, admin_ids):
                     try:
                         exp_time = datetime.fromisoformat(expiry_str)
                         if datetime.now() > exp_time:
-                            # Expired
                             await db.execute("UPDATE users SET is_premium=0, premium_expiry=NULL, is_adm_premium=0, plan='free' WHERE user_id=?", (int(user_id),))
                             await db.commit()
                             return False
@@ -250,13 +263,14 @@ async def is_premium_db(user_id, admin_ids):
                 return True
             return False
 
+
 async def get_user_plan(user_id):
     async with aiosqlite.connect(DB_FILE) as db:
         async with db.execute("SELECT is_premium, premium_expiry, plan, is_adm_premium FROM users WHERE user_id = ?", (int(user_id),)) as cursor:
             row = await cursor.fetchone()
             if not row:
                 return 'free'
-            
+
             is_prem = row[0]
             expiry_str = row[1]
             plan = row[2]
@@ -275,6 +289,7 @@ async def get_user_plan(user_id):
                 return plan if plan else 'premium'
             return 'free'
 
+
 async def add_premium_user(user_id, expiry=None, plan='premium'):
     async with aiosqlite.connect(DB_FILE) as db:
         await db.execute("""
@@ -284,10 +299,12 @@ async def add_premium_user(user_id, expiry=None, plan='premium'):
         """, (int(user_id), expiry, plan, expiry, plan))
         await db.commit()
 
+
 async def remove_premium_user(user_id):
     async with aiosqlite.connect(DB_FILE) as db:
         await db.execute("UPDATE users SET is_premium=0, premium_expiry=NULL, is_adm_premium=0 WHERE user_id=?", (int(user_id),))
         await db.commit()
+
 
 async def add_adm_premium_user(user_id, expiry=None, plan='premium'):
     async with aiosqlite.connect(DB_FILE) as db:
@@ -298,11 +315,13 @@ async def add_adm_premium_user(user_id, expiry=None, plan='premium'):
         """, (int(user_id), expiry, plan, expiry, plan))
         await db.commit()
 
+
 async def remove_adm_premium_user(user_id):
     async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("UPDATE users SET is_adm_premium=0 WHERE user_id=?", (int(user_id),))
         await db.commit()
         return cursor.rowcount > 0
+
 
 async def is_adm_premium(user_id):
     async with aiosqlite.connect(DB_FILE) as db:
@@ -323,6 +342,7 @@ async def is_adm_premium(user_id):
         except Exception:
             return False
 
+
 async def get_adm_premium_users():
     async with aiosqlite.connect(DB_FILE) as db:
         try:
@@ -331,6 +351,9 @@ async def get_adm_premium_users():
                 return [{'user_id': r[0], 'expiry': r[1], 'plan': r[2]} for r in rows]
         except Exception:
             return []
+
+
+# ─── BAN SYSTEM ───────────────────────────────────────────────────────
 
 async def ban_user(user_id, reason="Gen Banned"):
     async with aiosqlite.connect(DB_FILE) as db:
@@ -341,9 +364,9 @@ async def ban_user(user_id, reason="Gen Banned"):
             )
         """)
         await db.execute("INSERT OR REPLACE INTO banned_users (user_id, reason) VALUES (?, ?)", (int(user_id), reason))
-        # Revoke premium as well
         await db.execute("UPDATE users SET is_premium=0, premium_expiry=NULL WHERE user_id=?", (int(user_id),))
         await db.commit()
+
 
 async def unban_user(user_id):
     async with aiosqlite.connect(DB_FILE) as db:
@@ -354,9 +377,9 @@ async def unban_user(user_id):
             )
         """)
         await db.execute("DELETE FROM banned_users WHERE user_id=?", (int(user_id),))
-        # Switch to free mode immediately
         await db.execute("UPDATE users SET is_premium=0, premium_expiry=NULL, plan='free' WHERE user_id=?", (int(user_id),))
         await db.commit()
+
 
 async def unban_all_users():
     async with aiosqlite.connect(DB_FILE) as db:
@@ -373,12 +396,13 @@ async def unban_all_users():
                     banned_ids.append(row[0])
         except Exception:
             pass
-            
+
         await db.execute("DELETE FROM banned_users")
         if banned_ids:
             placeholders = ','.join('?' for _ in banned_ids)
             await db.execute(f"UPDATE users SET is_premium=0, premium_expiry=NULL, plan='free' WHERE user_id IN ({placeholders})", tuple(banned_ids))
         await db.commit()
+
 
 async def get_banned_users():
     users = []
@@ -391,6 +415,7 @@ async def get_banned_users():
             pass
     return users
 
+
 async def is_banned(user_id):
     async with aiosqlite.connect(DB_FILE) as db:
         try:
@@ -400,12 +425,14 @@ async def is_banned(user_id):
         except Exception:
             return False
 
+
+# ─── KEYS ─────────────────────────────────────────────────────────────
+
 async def load_keys():
     keys = {}
     async with aiosqlite.connect(DB_FILE) as db:
         async with db.execute("SELECT * FROM keys") as cursor:
             async for row in cursor:
-                # 0:key, 1:type, 2:hours, 3:expiry, 4:limit, 5:count, 6:used_by, 7:created_at, 8:created_by
                 k = row[0]
                 keys[k] = {
                     'type': row[1],
@@ -418,6 +445,7 @@ async def load_keys():
                     'created_by': row[8]
                 }
     return keys
+
 
 async def save_keys(keys_dict):
     async with aiosqlite.connect(DB_FILE) as db:
@@ -433,10 +461,14 @@ async def save_keys(keys_dict):
             ))
         await db.commit()
 
+
 async def delete_key(key):
     async with aiosqlite.connect(DB_FILE) as db:
         await db.execute("DELETE FROM keys WHERE key=?", (key,))
         await db.commit()
+
+
+# ─── FILTERS ──────────────────────────────────────────────────────────
 
 async def load_price_filters():
     async with aiosqlite.connect(DB_FILE) as db:
@@ -446,10 +478,12 @@ async def load_price_filters():
                 return json.loads(row[0])
     return {}
 
+
 async def save_price_filters(filters_dict):
     async with aiosqlite.connect(DB_FILE) as db:
         await db.execute("INSERT OR REPLACE INTO price_filters (id, data) VALUES (1, ?)", (json.dumps(filters_dict),))
         await db.commit()
+
 
 async def load_sites_with_price():
     async with aiosqlite.connect(DB_FILE) as db:
@@ -459,16 +493,21 @@ async def load_sites_with_price():
                 return json.loads(row[0])
     return []
 
+
 async def save_sites_with_price(data_list):
     async with aiosqlite.connect(DB_FILE) as db:
         await db.execute("INSERT OR REPLACE INTO sites_price (id, data) VALUES (1, ?)", (json.dumps(data_list),))
         await db.commit()
+
+
+# ─── BIN CACHE ────────────────────────────────────────────────────────
 
 async def get_cached_bin(bin_number):
     async with aiosqlite.connect(DB_FILE) as db:
         async with db.execute("SELECT brand, type, level, bank, country, flag FROM bin_cache WHERE bin=?", (str(bin_number)[:6],)) as cursor:
             row = await cursor.fetchone()
             return row
+
 
 async def cache_bin(bin_number, brand, btype, level, bank, country, flag):
     async with aiosqlite.connect(DB_FILE) as db:
@@ -478,6 +517,9 @@ async def cache_bin(bin_number, brand, btype, level, bank, country, flag):
             VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (str(bin_number)[:6], brand, btype, level, bank, country, flag))
         await db.commit()
+
+
+# ─── STATS ────────────────────────────────────────────────────────────
 
 async def get_bot_stats():
     stats = {
@@ -494,15 +536,15 @@ async def get_bot_stats():
             async with db.execute("SELECT COUNT(*) FROM users") as cursor:
                 row = await cursor.fetchone()
                 stats['total_users'] = row[0] if row else 0
-                
+
             async with db.execute("SELECT COUNT(*) FROM users WHERE is_premium = 1") as cursor:
                 row = await cursor.fetchone()
                 stats['premium_users'] = row[0] if row else 0
-                
+
             async with db.execute("SELECT COUNT(*) FROM keys") as cursor:
                 row = await cursor.fetchone()
                 stats['total_keys'] = row[0] if row else 0
-                
+
             async with db.execute("SELECT COUNT(*) FROM bin_cache") as cursor:
                 row = await cursor.fetchone()
                 stats['total_bins'] = row[0] if row else 0
@@ -539,7 +581,8 @@ async def get_user_stats(user_id):
         'total_dead': 0,
         'hit_rate': 0.0,
         'premium_expiry': None,
-        'plan': 'free'
+        'plan': 'free',
+        'custom_limit': None
     }
     try:
         async with aiosqlite.connect(DB_FILE) as db:
@@ -569,22 +612,24 @@ async def get_user_stats(user_id):
         print(f"Error fetching user stats: {e}")
     return stats
 
+
 async def add_user_premium_time(user_id, add_delta):
     async with aiosqlite.connect(DB_FILE) as db:
         async with db.execute("SELECT premium_expiry FROM users WHERE user_id = ? AND is_premium = 1", (int(user_id),)) as cursor:
             row = await cursor.fetchone()
             if not row:
                 return False
-            
+
             try:
                 current_expiry = datetime.fromisoformat(row[0]) if row[0] else datetime.now()
             except:
                 current_expiry = datetime.now()
-                
+
             new_expiry = current_expiry + add_delta
             await db.execute("UPDATE users SET premium_expiry = ? WHERE user_id = ?", (new_expiry.isoformat(), int(user_id)))
             await db.commit()
             return True
+
 
 async def set_custom_limit(user_id, limit):
     async with aiosqlite.connect(DB_FILE) as db:
@@ -593,7 +638,6 @@ async def set_custom_limit(user_id, limit):
 
 
 async def get_expiring_premiums(hours=24):
-    """Get users whose premium expires within the next X hours."""
     users = []
     try:
         now = datetime.now()
@@ -616,7 +660,6 @@ async def get_expiring_premiums(hours=24):
 
 
 async def revoke_expired_premiums():
-    """Revoke premium from all expired users. Returns list of revoked user_ids."""
     revoked = []
     try:
         now = datetime.now().isoformat()
@@ -638,10 +681,9 @@ async def revoke_expired_premiums():
     return revoked
 
 
-# ─── USER SITES & PROXIES (MULTI-TENANT) ──────────────────────────────
+# ─── USER SITES (MULTI-TENANT) ───────────────────────────────────────
 
 async def get_user_sites(user_id, min_price=0.0, max_price=30.0):
-    """Get all active sites for a specific user within price range."""
     sites = []
     try:
         async with aiosqlite.connect(DB_FILE) as db:
@@ -656,8 +698,8 @@ async def get_user_sites(user_id, min_price=0.0, max_price=30.0):
         print(f"Error fetching user sites: {e}")
     return sites
 
+
 async def get_all_user_sites(user_id):
-    """Get all active sites for a user without price filtering."""
     sites = []
     try:
         async with aiosqlite.connect(DB_FILE) as db:
@@ -672,20 +714,26 @@ async def get_all_user_sites(user_id):
         print(f"Error fetching all user sites: {e}")
     return sites
 
-async def add_user_sites(user_id, sites_with_price, max_limit=200):
-    """Add sites for a specific user up to max_limit."""
+
+async def add_user_sites(user_id, sites_with_price, max_limit=None):
+    """✅ FIXED: Handle max_limit=None (unlimited)"""
     added = 0
     now = datetime.now().isoformat()
+
+    # None → unlimited
+    if max_limit is None:
+        max_limit = 10 ** 9
+
     try:
         async with aiosqlite.connect(DB_FILE) as db:
-            # Check current count
             async with db.execute("SELECT COUNT(*) FROM user_sites WHERE user_id = ?", (int(user_id),)) as cursor:
-                current_count = (await cursor.fetchone())[0]
-                
+                row = await cursor.fetchone()
+                current_count = row[0] if row else 0
+
             slots_available = max(0, max_limit - current_count)
             if slots_available <= 0:
                 return 0
-                
+
             for item in sites_with_price[:slots_available]:
                 url = item['url'].strip()
                 price = float(item.get('price', 0.0))
@@ -702,6 +750,7 @@ async def add_user_sites(user_id, sites_with_price, max_limit=200):
         print(f"Error adding user sites: {e}")
     return added
 
+
 async def remove_user_site(user_id, url):
     try:
         async with aiosqlite.connect(DB_FILE) as db:
@@ -711,6 +760,7 @@ async def remove_user_site(user_id, url):
     except Exception as e:
         print(f"Error removing user site: {e}")
         return False
+
 
 async def clear_user_sites(user_id):
     try:
@@ -722,16 +772,20 @@ async def clear_user_sites(user_id):
         print(f"Error clearing user sites: {e}")
         return False
 
+
 async def count_user_sites(user_id):
     try:
         async with aiosqlite.connect(DB_FILE) as db:
             async with db.execute("SELECT COUNT(*) FROM user_sites WHERE user_id = ?", (int(user_id),)) as cursor:
-                return (await cursor.fetchone())[0]
+                row = await cursor.fetchone()
+                return row[0] if row else 0
     except Exception:
         return 0
 
+
+# ─── USER PROXIES (MULTI-TENANT) ─────────────────────────────────────
+
 async def get_user_proxies(user_id):
-    """Get all active proxies for a specific user."""
     proxies = []
     try:
         async with aiosqlite.connect(DB_FILE) as db:
@@ -746,19 +800,26 @@ async def get_user_proxies(user_id):
         print(f"Error fetching user proxies: {e}")
     return proxies
 
-async def add_user_proxies(user_id, proxy_list, max_limit=200):
-    """Add proxies for a specific user up to max_limit."""
+
+async def add_user_proxies(user_id, proxy_list, max_limit=None):
+    """✅ FIXED: Handle max_limit=None (unlimited)"""
     added = 0
     now = datetime.now().isoformat()
+
+    # None → unlimited
+    if max_limit is None:
+        max_limit = 10 ** 9
+
     try:
         async with aiosqlite.connect(DB_FILE) as db:
             async with db.execute("SELECT COUNT(*) FROM user_proxies WHERE user_id = ?", (int(user_id),)) as cursor:
-                current_count = (await cursor.fetchone())[0]
-                
+                row = await cursor.fetchone()
+                current_count = row[0] if row else 0
+
             slots_available = max(0, max_limit - current_count)
             if slots_available <= 0:
                 return 0
-                
+
             for p in proxy_list[:slots_available]:
                 p_clean = p.strip()
                 if not p_clean:
@@ -776,6 +837,7 @@ async def add_user_proxies(user_id, proxy_list, max_limit=200):
         print(f"Error adding user proxies: {e}")
     return added
 
+
 async def remove_user_proxy(user_id, proxy):
     try:
         async with aiosqlite.connect(DB_FILE) as db:
@@ -785,6 +847,7 @@ async def remove_user_proxy(user_id, proxy):
     except Exception as e:
         print(f"Error removing user proxy: {e}")
         return False
+
 
 async def clear_user_proxies(user_id):
     try:
@@ -796,26 +859,30 @@ async def clear_user_proxies(user_id):
         print(f"Error clearing user proxies: {e}")
         return False
 
+
 async def count_user_proxies(user_id):
     try:
         async with aiosqlite.connect(DB_FILE) as db:
             async with db.execute("SELECT COUNT(*) FROM user_proxies WHERE user_id = ?", (int(user_id),)) as cursor:
-                return (await cursor.fetchone())[0]
+                row = await cursor.fetchone()
+                return row[0] if row else 0
     except Exception:
         return 0
 
+
+# ─── DETAILED USER INFO ──────────────────────────────────────────────
 
 async def get_all_users_detailed():
     users_dict = {}
     async with aiosqlite.connect(DB_FILE) as db:
         # 1. Get all bot users
         try:
-            async with db.execute("SELECT user_id, joined_at FROM bot_users") as cursor:
+            async with db.execute("SELECT user_id FROM users") as cursor:
                 async for row in cursor:
                     uid = row[0]
                     users_dict[uid] = {
                         'user_id': uid,
-                        'joined_at': row[1],
+                        'joined_at': 'N/A',
                         'plan': 'free',
                         'is_premium': 0,
                         'premium_expiry': None,
@@ -834,7 +901,7 @@ async def get_all_users_detailed():
         except Exception:
             pass
 
-        # 2. Get users table data (plan, premium)
+        # 2. Get users table data
         try:
             async with db.execute("SELECT user_id, is_premium, premium_expiry, plan, custom_limit FROM users") as cursor:
                 async for row in cursor:
@@ -869,13 +936,6 @@ async def get_all_users_detailed():
                     uid = row[0]
                     if uid in users_dict:
                         users_dict[uid]['sites_count'] = row[1]
-                    else:
-                        users_dict[uid] = {
-                            'user_id': uid, 'joined_at': 'N/A', 'plan': 'free', 'is_premium': 0,
-                            'premium_expiry': None, 'custom_limit': None, 'sites_count': row[1],
-                            'proxies_count': 0, 'total_cards': 0, 'charged': 0, 'approved': 0,
-                            'dead': 0, 'sessions': 0, 'hit_rate': 0.0, 'is_banned': False, 'ban_reason': ''
-                        }
         except Exception:
             pass
 
@@ -886,13 +946,6 @@ async def get_all_users_detailed():
                     uid = row[0]
                     if uid in users_dict:
                         users_dict[uid]['proxies_count'] = row[1]
-                    else:
-                        users_dict[uid] = {
-                            'user_id': uid, 'joined_at': 'N/A', 'plan': 'free', 'is_premium': 0,
-                            'premium_expiry': None, 'custom_limit': None, 'sites_count': 0,
-                            'proxies_count': row[1], 'total_cards': 0, 'charged': 0, 'approved': 0,
-                            'dead': 0, 'sessions': 0, 'hit_rate': 0.0, 'is_banned': False, 'ban_reason': ''
-                        }
         except Exception:
             pass
 
@@ -975,7 +1028,6 @@ async def get_single_user_detailed_info(user_id):
         'ban_reason': ''
     }
     async with aiosqlite.connect(DB_FILE) as db:
-        # Plan info
         try:
             async with db.execute("SELECT is_premium, premium_expiry, plan, custom_limit FROM users WHERE user_id = ?", (int(user_id),)) as cursor:
                 row = await cursor.fetchone()
@@ -997,7 +1049,6 @@ async def get_single_user_detailed_info(user_id):
         except Exception:
             pass
 
-        # Sites count
         try:
             async with db.execute("SELECT COUNT(*) FROM user_sites WHERE user_id = ?", (int(user_id),)) as cursor:
                 row = await cursor.fetchone()
@@ -1005,7 +1056,6 @@ async def get_single_user_detailed_info(user_id):
         except Exception:
             pass
 
-        # Proxies count
         try:
             async with db.execute("SELECT COUNT(*) FROM user_proxies WHERE user_id = ?", (int(user_id),)) as cursor:
                 row = await cursor.fetchone()
@@ -1013,7 +1063,6 @@ async def get_single_user_detailed_info(user_id):
         except Exception:
             pass
 
-        # Stats
         try:
             async with db.execute("""
                 SELECT COUNT(*), COALESCE(SUM(total_cards),0), COALESCE(SUM(charged),0),
@@ -1033,7 +1082,6 @@ async def get_single_user_detailed_info(user_id):
         except Exception:
             pass
 
-        # Ban status
         try:
             async with db.execute("SELECT reason FROM banned_users WHERE user_id = ?", (int(user_id),)) as cursor:
                 row = await cursor.fetchone()
@@ -1044,4 +1092,3 @@ async def get_single_user_detailed_info(user_id):
             pass
 
     return info
-
