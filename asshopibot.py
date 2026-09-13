@@ -29,7 +29,9 @@ except FileNotFoundError:
         json.dump(ADMIN_ID, f)
 
 API_SERVERS = [
-    'https://asbroh-api-production-1f7e3.up.railway.app',
+    'https://asbroh-railwey-production.up.railway.app',
+    'https://asbroh01-railwey-production.up.railway.app',
+    'https://uras-railwey-production.up.railway.app',
 ]
 
 
