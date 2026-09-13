@@ -2831,7 +2831,7 @@ async def process_user_sites_check(event_or_msg, user_id, sites_list, min_price,
         await asyncio.gather(*tasks)
 
         # Save to database
-        added = await db_manager.add_user_sites(user_id, sites_with_price, max_limit=200)
+        added = await db_manager.add_user_sites(user_id, sites_with_price, max_limit=none)
         total_sites = await db_manager.count_user_sites(user_id)
 
         preview = "\n".join(alive_sites[:20])
@@ -2845,7 +2845,7 @@ async def process_user_sites_check(event_or_msg, user_id, sites_list, min_price,
    ┣ 🎯 Pʀɪᴄᴇ Rᴀɴɢᴇ: ${min_price:g} – ${max_price:g}
    ┣ ✅ Aʟɪᴠᴇ & Aᴅᴅᴇᴅ: {added}
    ┣ ❌ Dᴇᴀᴅ / Oᴜᴛ ᴏғ Rᴀɴɢᴇ: {len(dead_sites)}
-   ┗ 📁 Tᴏᴛᴀʟ ɪɴ ʏᴏᴜʀ ᴘᴏᴏʟ: {total_sites}/200
+   ┗ 📁 Tᴏᴛᴀʟ ɪɴ ʏᴏᴜʀ ᴘᴏᴏʟ: {total_sites}
 
 🌐 <b>Aᴅᴅᴇᴅ Sɪᴛᴇs:</b>
 <code>{preview}</code>{more}"""),
@@ -3096,7 +3096,7 @@ async def site_command(event):
 
         # Update DB for user
         await db_manager.clear_user_sites(user_id)
-        await db_manager.add_user_sites(user_id, alive_with_price, max_limit=200)
+        await db_manager.add_user_sites(user_id, alive_with_price, max_limit=none)
 
         preview = "\n".join(alive_sites[:20])
         more = f"\n...and {len(alive_sites) - 20} more" if len(alive_sites) > 20 else ""
@@ -3108,7 +3108,7 @@ async def site_command(event):
    ┣ 📁 Tᴏᴛᴀʟ: {len(sites_with_p)}
    ┣ ✅ Aʟɪᴠᴇ: {len(alive_sites)}
    ┣ ❌ Rᴇᴍᴏᴠᴇᴅ: {len(dead_sites)}
-   ┗ 📁 Cᴜʀʀᴇɴᴛ Pᴏᴏʟ: {len(alive_sites)}/200
+   ┗ 📁 Cᴜʀʀᴇɴᴛ Pᴏᴏʟ: {len(alive_sites)}
 
 🌐 <b>Aʟɪᴠᴇ Sɪᴛᴇs:</b>
 <code>{preview}</code>{more}"""),
