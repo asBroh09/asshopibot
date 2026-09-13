@@ -189,7 +189,7 @@ async def check_adyen_card_with_retry(card: str, gateway_key: str = "ady1", prox
 ACTIVE_API_SERVERS = API_SERVERS.copy()
 DEAD_API_SERVERS = set()
 
-CHECKER_API_KEY = "AnonShopii2026!"
+CHECKER_API_KEY = "DARKANONSHO!!!"
 
 SITES_FILE = 'sites.txt'
 PROXY_FILE = 'proxy.txt'
