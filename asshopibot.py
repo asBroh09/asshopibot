@@ -32,7 +32,7 @@ API_SERVERS = [
     'https://urasbro-railwey-production.up.railway.app',
     'https://urasbroh2-railwey-production.up.railway.app',
     'https://measbroh1-railwey-production.up.railway.app',
-    'https://asbroh022-production.up.railway.app',
+    'https://asbroh022-production-8de56.up.railway.app',
 ]
 
 # ─── OFFICIAL GATE RESPONSE CLASSIFIER (AUGUST 2026 STANDARDS) ──────────────
