@@ -18,7 +18,7 @@ from typing import Optional
 
 API_ID = 36327505
 API_HASH = 'b6d91e065b2e541c86a2ece75e901a53'
-BOT_TOKEN = '8713237079:AAESx3TVXBs796_HWeC2FHoPhcCmptuduS8'
+BOT_TOKEN = '8706258978:AAE2NSvzLIGeaxM-oDZJ8mYQ7fNC6hL1jWs'
 ADMIN_FILE = 'admins.json'
 try:
     with open(ADMIN_FILE, 'r') as f:
