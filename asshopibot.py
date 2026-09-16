@@ -33,6 +33,8 @@ API_SERVERS = [
     'https://urasbroh2-railwey-production.up.railway.app',
     'https://measbroh1-railwey-production.up.railway.app',
     'https://asbroh022-production-8de56.up.railway.app',
+    'https://urass-railwey-production.up.railway.app',
+    'https://uras00-railwey-production.up.railway.app',
 ]
 
 # ─── OFFICIAL GATE RESPONSE CLASSIFIER (AUGUST 2026 STANDARDS) ──────────────
@@ -465,7 +467,7 @@ def get_main_menu_keyboard(user_id=None):
     buttons = [
         [Button.inline(" Cᴍᴅ", b"show_cmds", style="primary", icon=4904936030232117798),
          Button.inline(" Tᴏᴏʟs", b"tools_menu", style="primary", icon=5361734213370396027)],
-        [Button.url(" Cʜᴀɴɴᴇʟ", "https://t.me/+_L8UIMAAFIBmOTgx",
+        [Button.url(" Cʜᴀɴɴᴇʟ", "https://t.me/zeroxcc_Hit",
                     style="success", icon=5445408306669582934)]
     ]
     if user_id and user_id in ADMIN_ID:
