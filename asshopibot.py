@@ -2834,7 +2834,7 @@ async def process_user_sites_check(event_or_msg, user_id, sites_list, min_price,
         await asyncio.gather(*tasks)
 
         # Save to database
-        added = await db_manager.add_user_sites(user_id, sites_with_price, max_limit=None)
+        added = await db_manager.add_user_sites(user_id, sites_with_price, max_limit=2000)
         total_sites = await db_manager.count_user_sites(user_id)
 
         preview = "\n".join(alive_sites[:20])
