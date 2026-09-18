@@ -3099,7 +3099,7 @@ async def site_command(event):
 
         # Update DB for user
         await db_manager.clear_user_sites(user_id)
-        await db_manager.add_user_sites(user_id, alive_with_price, max_limit=None)
+        await db_manager.add_user_sites(user_id, alive_with_price, max_limit=2000)
 
         preview = "\n".join(alive_sites[:20])
         more = f"\n...and {len(alive_sites) - 20} more" if len(alive_sites) > 20 else ""
