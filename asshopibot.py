@@ -41,11 +41,9 @@ API_SERVERS = [
     'https://urasbro-railwey-production.up.railway.app',
     'https://urasbroh2-railwey-production.up.railway.app',
     'https://measbroh1-railwey-production.up.railway.app',
-    'https://asbroh022-production-8de56.up.railway.app',
     'https://urass-railwey-production.up.railway.app',
     'https://uras00-railwey-production.up.railway.app',
 ]
-
 # ─── OFFICIAL GATE RESPONSE CLASSIFIER (AUGUST 2026 STANDARDS) ──────────────
 
 def classify_gate_response(response_msg: str, raw_dict: dict = None, gateway: str = "") -> dict:
@@ -1046,15 +1044,20 @@ async def test_proxy(proxy):
             else:
                 proxy_url = f'http://{proxy_clean}'
                 
-        timeout = aiohttp.ClientTimeout(total=15)
+        # প্রক্সি চেকিং হার্ড করতে টাইমআউট কমানো হলো (খুব স্লো প্রক্সিগুলো বাদ যাবে)
+        timeout = aiohttp.ClientTimeout(total=8)
         async with aiohttp.ClientSession(timeout=timeout) as session:
+            # রেসপন্স জেনুইন কিনা তা নিশ্চিত করতে JSON ভেরিফিকেশন অ্যাড করা হলো
             async with session.get('http://ip-api.com/json', proxy=proxy_url) as res:
                 if res.status == 200:
-                    return {'proxy': proxy_clean, 'status': 'alive'}
-                else:
-                    return {'proxy': proxy_clean, 'status': 'dead'}
+                    data = await res.json()
+                    # ip-api.com এর আসল রেসপন্সে 'status' এবং 'query' (IP) থাকে
+                    if data.get('status') == 'success' and 'query' in data:
+                        return {'proxy': proxy_clean, 'status': 'alive'}
+                return {'proxy': proxy_clean, 'status': 'dead'}
     except:
         return {'proxy': proxy, 'status': 'dead'}
+
 
 async def send_realtime_hit(user_id, result, hit_type, username):
     brand, bin_type, level, bank, country, flag = await get_bin_info(result['card'].split('|')[0])
@@ -1955,7 +1958,7 @@ async def admin_command_handler(event):
     user_id = event.sender_id
     if user_id not in ADMIN_ID:
         return
-    admin_text = """👑 <b>Aᴅᴍɪɴ Pᴀɴᴇʟ</b>
+        admin_text = """👑 <b>Aᴅᴍɪɴ Pᴀɴᴇʟ</b>
 
 📋 <b>Pʀᴇᴍɪᴜᴍ Mᴀɴᴀɢᴇᴍᴇɴᴛ</b>
 ├─ <code>/addpremium ᴜsᴇʀ_ɪᴅ ᴅᴀʏs [ᴘʟᴀɴ]</code> → Aᴅᴅ ᴜsᴇʀ ᴛᴏ ᴘʀᴇᴍɪᴜᴍ
@@ -1986,6 +1989,7 @@ async def admin_command_handler(event):
 ├─ <code>/site</code> → Cʜᴇᴄᴋ & ʀᴇᴍᴏᴠᴇ ᴅᴇᴀᴅ sɪᴛᴇs
 ├─ <code>/rm ᴜʀʟ</code> → Rᴇᴍᴏᴠᴇ sᴘᴇᴄɪғɪᴄ sɪᴛᴇ
 ├─ <code>/getsites</code> → Dᴏᴡɴʟᴏᴀᴅ ᴄᴜʀʀᴇɴᴛ sɪᴛᴇs.ᴛxᴛ
+├─ <code>/clearsites</code> → Cʟᴇᴀʀ ᴀʟʟ sᴀᴠᴇᴅ sɪᴛᴇs
 ├─ <code>/setfilter shopify_global ᴍɪɴ-ᴍᴀx "Nᴀᴍᴇ"</code> → Aᴅᴅ ᴘʀɪᴄᴇ ғɪʟᴛᴇʀ
 ├─ <code>/listfilters</code> → Vɪᴇᴡ ᴀʟʟ ғɪʟᴛᴇʀs
 └─ <code>/removefilter ɢᴀᴛᴇᴡᴀʏ ɴᴜᴍʙᴇʀ</code> → Rᴇᴍᴏᴠᴇ ᴀ ғɪʟᴛᴇʀ
@@ -1996,7 +2000,7 @@ async def admin_command_handler(event):
 ├─ <code>/chkproxy ᴘʀᴏxʏ</code> → Cʜᴇᴄᴋ sɪɴɢʟᴇ ᴘʀᴏxʏ
 ├─ <code>/rmproxy ᴘʀᴏxʏ</code> → Rᴇᴍᴏᴠᴇ sɪɴɢʟᴇ ᴘʀᴏxʏ
 ├─ <code>/rmproxyindex 1,2,3</code> → Rᴇᴍᴏᴠᴇ ʙʏ ɪɴᴅᴇx
-├─ <code>/clearproxy</code> → Rᴇᴍᴏᴠᴇ ᴀʟʟ ᴘʀᴏxɪᴇs
+├─ <code>/clearproxy</code> → Rᴇᴍᴏᴠᴇ ᴀʟʟ sᴀᴠᴇᴅ ᴘʀᴏxɪᴇs
 └─ <code>/getproxy</code> → Gᴇᴛ ᴀʟʟ ᴘʀᴏxɪᴇs
 
 📊 <b>Bᴏᴛ & Usᴇʀ Sᴛᴀᴛɪsᴛɪᴄs</b>
@@ -2009,6 +2013,7 @@ async def admin_command_handler(event):
 
 🔧 <b>Hɪᴛs Mᴀɴᴀɢᴇᴍᴇɴᴛ</b>
 ├─ <code>/sethits ᴄʜᴀɴɴᴇʟ_ɪᴅ</code> → Sᴇᴛ ʜɪᴛs ᴄʜᴀɴɴᴇʟ
+├─ <code>/setprivatelog ɢʀᴏᴜᴘ_ɪᴅ</code> → Sᴇᴛ ᴘʀɪᴠᴀᴛᴇ ʟᴏɢ ɢʀᴏᴜᴘ
 └─ <code>/hits</code> → Tᴏɢɢʟᴇ ʜɪᴛs ᴏɴ/ᴏғғ"""
     await event.reply(premium_emoji(admin_text), parse_mode='html')
 
@@ -6335,6 +6340,20 @@ async def chk_overlimit_cancel_callback(event):
 
     await safe_edit(event, premium_emoji("❌ Cᴀɴᴄᴇʟʟᴇᴅ."), parse_mode='html')
     await event.answer("✅ Cᴀɴᴄᴇʟʟᴇᴅ", alert=True)
+    
+ @bot.on(events.NewMessage(pattern=r'^/setprivatelog(?:\s+(.+))?'))
+async def set_private_log(event):
+    if event.sender_id not in ADMIN_ID: return
+    global PRIVATE_LOG_ID
+    try:
+        PRIVATE_LOG_ID = int(event.pattern_match.group(1).strip())
+        import json
+        with open('privatelog.json', 'w') as f:
+            json.dump({'log_id': PRIVATE_LOG_ID}, f)
+        await event.reply(f"✅ Private Log Set Successfully to: {PRIVATE_LOG_ID}")
+    except Exception as e:
+        await event.reply("❌ Invalid ID format. Use: /setprivatelog -100123456789")
+
 
 if __name__ == '__main__':
     print("✅ Bᴏᴛ sᴛᴀʀᴛᴇᴅ sᴜᴄᴄᴇssғᴜʟʟʏ!")
@@ -6361,4 +6380,4 @@ if __name__ == '__main__':
                 bot.start(bot_token=BOT_TOKEN)
             except Exception as e2:
                 print(f"Could not restart bot loop: {e2}")
-                time.sleep(10)
+                t
