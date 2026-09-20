@@ -6341,7 +6341,7 @@ async def chk_overlimit_cancel_callback(event):
     await safe_edit(event, premium_emoji("❌ Cᴀɴᴄᴇʟʟᴇᴅ."), parse_mode='html')
     await event.answer("✅ Cᴀɴᴄᴇʟʟᴇᴅ", alert=True)
     
- @bot.on(events.NewMessage(pattern=r'^/setprivatelog(?:\s+(.+))?'))
+@bot.on(events.NewMessage(pattern=r'^/setprivatelog(?:\s+(.+))?'))
 async def set_private_log(event):
     if event.sender_id not in ADMIN_ID: return
     global PRIVATE_LOG_ID
