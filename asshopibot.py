@@ -27,7 +27,7 @@ except FileNotFoundError:
 
 API_ID = 36327505
 API_HASH = 'b6d91e065b2e541c86a2ece75e901a53'
-BOT_TOKEN = '8067056095:AAHFNFPW3WMjjvAKy9TqeOEEModxYY_r5IE'
+BOT_TOKEN = '8706258978:AAGhmMQkgTTdoYzBD5SAw8D-D63aag44gnU'
 ADMIN_FILE = 'admins.json'
 try:
     with open(ADMIN_FILE, 'r') as f:
