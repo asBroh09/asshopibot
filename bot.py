@@ -16,23 +16,21 @@ import io
 from datetime import datetime, timedelta
 from typing import Optional
 
-API_ID = 'PUT OWN APP ID'
-API_HASH = 'PUT OWN API HASH'
-BOT_TOKEN = 'PUT OWN BOT TOKEN'
+API_ID = '36327505'
+API_HASH = 'b6d91e065b2e541c86a2ece75e901a53'
+BOT_TOKEN = '8706258978:AAFSZe-tneOp8hqXYIH-EGI0-IskxikLXUs'
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ADMIN_FILE = os.path.join(BASE_DIR, 'admins.json')
 try:
     with open(ADMIN_FILE, 'r') as f:
         ADMIN_ID = json.load(f)
 except FileNotFoundError:
-    ADMIN_ID = [7549544641]
+    ADMIN_ID = [8524951580, 8293984966]
     with open(ADMIN_FILE, 'w') as f:
         json.dump(ADMIN_ID, f)
 
 API_SERVERS = [
     'https://urasbro-railwey-production.up.railway.app',
-    'https://urasbroh2-railwey-production.up.railway.app',
-    'https://measbroh1-railwey-production.up.railway.app',
     'https://urass-railwey-production.up.railway.app',
     'https://uras00-railwey-production.up.railway.app',
 ]
